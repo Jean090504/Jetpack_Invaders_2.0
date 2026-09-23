@@ -32,8 +32,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -71,9 +69,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jetpackinvaders20.ui.theme.JetpackInvaders20Theme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -84,10 +79,9 @@ import kotlin.random.Random
 // -------------------------------------------------------------
 class ArcadeAudioEngine(private val isSoundEnabled: () -> Boolean) {
     private val toneGen: ToneGenerator? = try {
-        ToneGenerator(AudioManager.STREAM_MUSIC, 18)
+        ToneGenerator(AudioManager.STREAM_MUSIC, 16)
     } catch (_: Exception) { null }
 
-    private val audioScope = CoroutineScope(Dispatchers.Default)
     private var lastLaserToneTime = 0L
 
     fun playLaser() {
@@ -95,53 +89,42 @@ class ArcadeAudioEngine(private val isSoundEnabled: () -> Boolean) {
         val now = System.currentTimeMillis()
         if (now - lastLaserToneTime < 75L) return
         lastLaserToneTime = now
-
-        audioScope.launch {
-            try {
-                toneGen?.stopTone()
-                toneGen?.startTone(ToneGenerator.TONE_PROP_BEEP, 25)
-            } catch (_: Exception) {}
-        }
+        try {
+            toneGen?.stopTone()
+            toneGen?.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+        } catch (_: Exception) {}
     }
 
     fun playExplosion() {
         if (!isSoundEnabled()) return
-        audioScope.launch {
-            try {
-                toneGen?.stopTone()
-                toneGen?.startTone(ToneGenerator.TONE_CDMA_SOFT_ERROR_LITE, 60)
-            } catch (_: Exception) {}
-        }
+        try {
+            toneGen?.stopTone()
+            toneGen?.startTone(ToneGenerator.TONE_CDMA_SOFT_ERROR_LITE, 50)
+        } catch (_: Exception) {}
     }
 
     fun playPowerUp() {
         if (!isSoundEnabled()) return
-        audioScope.launch {
-            try {
-                toneGen?.stopTone()
-                toneGen?.startTone(ToneGenerator.TONE_PROP_PROMPT, 80)
-            } catch (_: Exception) {}
-        }
+        try {
+            toneGen?.stopTone()
+            toneGen?.startTone(ToneGenerator.TONE_PROP_PROMPT, 60)
+        } catch (_: Exception) {}
     }
 
     fun playBossAlarm() {
         if (!isSoundEnabled()) return
-        audioScope.launch {
-            try {
-                toneGen?.stopTone()
-                toneGen?.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 140)
-            } catch (_: Exception) {}
-        }
+        try {
+            toneGen?.stopTone()
+            toneGen?.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 100)
+        } catch (_: Exception) {}
     }
 
     fun playBomb() {
         if (!isSoundEnabled()) return
-        audioScope.launch {
-            try {
-                toneGen?.stopTone()
-                toneGen?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 110)
-            } catch (_: Exception) {}
-        }
+        try {
+            toneGen?.stopTone()
+            toneGen?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 80)
+        } catch (_: Exception) {}
     }
 
     fun release() {
@@ -163,23 +146,24 @@ enum class BossType(val displayName: String) {
     MOTHERSHIP("Nave-Mãe"),
     DREADNOUGHT("Orbital"),
     SERPENTOID("Serpentoid"),
-    OVERLORD("Overlord")
+    OMEGA("Ômega Supremo")
 }
 
 enum class ShipPerk { BALANCED, RAPID_ASSAULT, HEAVY_SHIELD, DOUBLE_DAMAGE, TIME_WARP }
 
 enum class EnemyKind {
-    // Era 0
     NORMAL_INVADER,
     BEETLE_SHOOTER,
-    // Era 1 (Fogo)
     ERA_FIRE_GLAIVE,
     ERA_FIRE_VESPA,
     ERA_FIRE_ARIETE,
-    // Era 2 (Bio-Verde)
     ERA_BIO_PARASITA,
     ERA_BIO_INSECTOID,
-    ERA_BIO_CASULO
+    ERA_BIO_CASULO,
+    // Era 3: O Vazio
+    ERA_VOID_PRISMA,
+    ERA_VOID_TESSERACT,
+    ERA_VOID_ENIGMA
 }
 
 data class ShipSkin(
@@ -231,7 +215,8 @@ class Enemy(
     val era: Int = 0,
     var isDiving: Boolean = false,
     var diveVx: Float = 0f,
-    var hasShield: Boolean = false
+    var hasShield: Boolean = false,
+    var isPhasedOut: Boolean = false // Propriedade adicionada para resolver o erro
 )
 
 class RusherEnemy(
@@ -382,10 +367,7 @@ class MainActivity : ComponentActivity() {
 }
 
 // -------------------------------------------------------------
-// TELA DE ENTRADA (SELETOR DE ERAS REORGANIZADO)
-// -------------------------------------------------------------
-// -------------------------------------------------------------
-// TELA DE ENTRADA (LAYOUT FINAL ARCADE / RETRÔ COM ESQUADRILHA)
+// TELA DE ENTRADA
 // -------------------------------------------------------------
 @Composable
 fun CoverScreen(
@@ -402,21 +384,14 @@ fun CoverScreen(
 ) {
     val context = LocalContext.current
 
-    // Caças exibidos na formação da tela inicial
-    val valkyrieBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.valkyrie).asImageBitmap()
-    }
-    val spectreBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.spectre).asImageBitmap()
-    }
-    val phoenixBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.phoenix).asImageBitmap()
-    }
+    val valkyrieBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.valkyrie).asImageBitmap() }
+    val spectreBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.spectre).asImageBitmap() }
+    val phoenixBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.phoenix).asImageBitmap() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090024)) // Fundo violeta cósmico escuro da referência
+            .background(Color(0xFF090024))
             .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
         Column(
@@ -424,17 +399,11 @@ fun CoverScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // ---------------------------------------------------------
-            // TOPO: PLACAS RETANGULARES (AUDIO E MOEDAS)
-            // ---------------------------------------------------------
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Caixa de Áudio
                 Box(
                     modifier = Modifier
                         .size(width = 110.dp, height = 54.dp)
@@ -449,35 +418,21 @@ fun CoverScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "AUDIO",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
+                        Text("AUDIO", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (soundEnabled) "🔊" else "🔇",
-                            fontSize = 14.sp
-                        )
+                        Text(if (soundEnabled) "🔊" else "🔇", fontSize = 14.sp)
                     }
                 }
 
-                // Botão secreto de Dev Mode no centro do topo (discreto)
                 Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .pointerInput(Unit) {
-                            awaitEachGesture {
-                                awaitFirstDown()
-                                onDevModeClick()
-                            }
+                    modifier = Modifier.size(24.dp).pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown()
+                            onDevModeClick()
                         }
+                    }
                 )
 
-                // Caixa de Moedas
                 Box(
                     modifier = Modifier
                         .size(width = 110.dp, height = 54.dp)
@@ -486,109 +441,44 @@ fun CoverScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "MOEDAS",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
+                        Text("MOEDAS", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "$coins",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Text("$coins", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
 
-            // ---------------------------------------------------------
-            // CENTRO: TÍTULO, ESQUADRILHA DE CAÇAS E RECORDE
-            // ---------------------------------------------------------
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(vertical = 10.dp)
             ) {
-                // Título Pixel/Arcade
-                Text(
-                    text = "JETPACK",
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    letterSpacing = 6.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    text = "INVADERS",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    letterSpacing = 5.sp,
-                    fontFamily = FontFamily.Monospace
-                )
+                Text("JETPACK", fontSize = 38.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 6.sp, fontFamily = FontFamily.Monospace)
+                Text("INVADERS", fontSize = 36.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 5.sp, fontFamily = FontFamily.Monospace)
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Formação da Esquadrilha (Valkyrie no centro e maior, Spectre e Phoenix nas pontas)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val centerX = size.width / 2f
                         val centerY = size.height / 2f
 
-                        // 1. Asa Esquerda (Spectre)
                         rotate(degrees = 90f, pivot = Offset(centerX - 95f, centerY - 15f)) {
-                            drawImage(
-                                image = spectreBitmap,
-                                dstOffset = IntOffset((centerX - 135f).toInt(), (centerY - 55f).toInt()),
-                                dstSize = IntSize(80.dp.toPx().toInt(), 80.dp.toPx().toInt()),
-                                filterQuality = FilterQuality.None
-                            )
+                            drawImage(image = spectreBitmap, dstOffset = IntOffset((centerX - 135f).toInt(), (centerY - 55f).toInt()), dstSize = IntSize(80.dp.toPx().toInt(), 80.dp.toPx().toInt()), filterQuality = FilterQuality.None)
                         }
 
-                        // 2. Asa Direita (Phoenix)
                         rotate(degrees = 90f, pivot = Offset(centerX + 95f, centerY - 15f)) {
-                            drawImage(
-                                image = phoenixBitmap,
-                                dstOffset = IntOffset((centerX + 55f).toInt(), (centerY - 55f).toInt()),
-                                dstSize = IntSize(80.dp.toPx().toInt(), 80.dp.toPx().toInt()),
-                                filterQuality = FilterQuality.None
-                            )
+                            drawImage(image = phoenixBitmap, dstOffset = IntOffset((centerX + 55f).toInt(), (centerY - 55f).toInt()), dstSize = IntSize(80.dp.toPx().toInt(), 80.dp.toPx().toInt()), filterQuality = FilterQuality.None)
                         }
 
-                        // 3. Caça Líder Central (Valkyrie - Destaque maior)
                         rotate(degrees = 90f, pivot = Offset(centerX, centerY)) {
-                            drawImage(
-                                image = valkyrieBitmap,
-                                dstOffset = IntOffset((centerX - 60.dp.toPx()).toInt(), (centerY - 60.dp.toPx()).toInt()),
-                                dstSize = IntSize(120.dp.toPx().toInt(), 120.dp.toPx().toInt()),
-                                filterQuality = FilterQuality.None
-                            )
+                            drawImage(image = valkyrieBitmap, dstOffset = IntOffset((centerX - 60.dp.toPx()).toInt(), (centerY - 60.dp.toPx()).toInt()), dstSize = IntSize(120.dp.toPx().toInt(), 120.dp.toPx().toInt()), filterQuality = FilterQuality.None)
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
+                Text("TOP RECORD: $highScore", color = Color(0xFFFFD700), fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
 
-                // Placar de Recorde
-                Text(
-                    text = "TOP RECORD: $highScore",
-                    color = Color(0xFFFFD700),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
-
-                // Painel de Testes Dev (aparece apenas quando o Modo Dev estiver ligado)
                 if (isDevMode) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Column(
@@ -599,29 +489,22 @@ fun CoverScreen(
                             .padding(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "[TESTE DEV - SELETOR DE FASES]",
-                            color = Color(0xFF38BDF8),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Text("[TESTE DEV - SELETOR DE FASES]", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         Spacer(modifier = Modifier.height(6.dp))
 
                         val shortcuts = listOf(
                             1 to "E0 (S1)",
-                            5 to "B1 (S5)",
                             6 to "E1 (S6)",
-                            10 to "B2 (S10)",
                             11 to "E2 (S11)",
-                            15 to "B3 (S15)"
+                            16 to "E3 (S16)",
+                            20 to "ÔMEGA (S20)"
                         )
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            shortcuts.take(3).forEach { (w, label) ->
+                            shortcuts.forEach { (w, label) ->
                                 Button(
                                     onClick = { onSelectWave(w) },
                                     colors = ButtonDefaults.buttonColors(
@@ -631,28 +514,7 @@ fun CoverScreen(
                                     modifier = Modifier.weight(1f).height(28.dp),
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                                 ) {
-                                    Text(label, color = if (selectedWave == w) Color.Black else Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            shortcuts.drop(3).forEach { (w, label) ->
-                                Button(
-                                    onClick = { onSelectWave(w) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (selectedWave == w) Color(0xFF10B981) else Color(0xFF1E1B4B)
-                                    ),
-                                    shape = RoundedCornerShape(2.dp),
-                                    modifier = Modifier.weight(1f).height(28.dp),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                                ) {
-                                    Text(label, color = if (selectedWave == w) Color.Black else Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                    Text(label, color = if (selectedWave == w) Color.Black else Color.White, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
                                 }
                             }
                         }
@@ -660,35 +522,17 @@ fun CoverScreen(
                 }
             }
 
-            // ---------------------------------------------------------
-            // INFERIOR: BOTÕES DE AÇÃO OVAIS TRANSLÚCIDOS (ESTILO IMAGEM)
-            // ---------------------------------------------------------
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Botão "INICIAR MISSÃO"
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .height(54.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFF3B2D6B).copy(alpha = 0.55f),
-                                    Color(0xFF1E143D).copy(alpha = 0.85f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(27.dp)
-                        )
-                        .border(
-                            width = 1.5.dp,
-                            color = Color(0xFF8B7AB8).copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(27.dp)
-                        )
+                        .background(brush = Brush.verticalGradient(listOf(Color(0xFF3B2D6B).copy(alpha = 0.55f), Color(0xFF1E143D).copy(alpha = 0.85f))), shape = RoundedCornerShape(27.dp))
+                        .border(1.5.dp, Color(0xFF8B7AB8).copy(alpha = 0.6f), RoundedCornerShape(27.dp))
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 awaitFirstDown()
@@ -697,35 +541,15 @@ fun CoverScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "INICIAR MISSÃO",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp
-                    )
+                    Text("INICIAR MISSÃO", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
                 }
 
-                // Botão "SKINS"
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .height(54.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFF3B2D6B).copy(alpha = 0.55f),
-                                    Color(0xFF1E143D).copy(alpha = 0.85f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(27.dp)
-                        )
-                        .border(
-                            width = 1.5.dp,
-                            color = Color(0xFF8B7AB8).copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(27.dp)
-                        )
+                        .background(brush = Brush.verticalGradient(listOf(Color(0xFF3B2D6B).copy(alpha = 0.55f), Color(0xFF1E143D).copy(alpha = 0.85f))), shape = RoundedCornerShape(27.dp))
+                        .border(1.5.dp, Color(0xFF8B7AB8).copy(alpha = 0.6f), RoundedCornerShape(27.dp))
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 awaitFirstDown()
@@ -734,14 +558,7 @@ fun CoverScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "SKINS",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp
-                    )
+                    Text("SKINS", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
                 }
             }
         }
@@ -771,149 +588,59 @@ fun HangarScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF030712))
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize().background(Color(0xFF030712)).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(
-                onClick = onBack,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
-                shape = RoundedCornerShape(2.dp)
-            ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)), shape = RoundedCornerShape(2.dp)) {
                 Text("< VOLTAR", color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
 
-            Button(
-                onClick = onDevModeClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isDevMode) Color(0xFF15803D) else Color(0xFF991B1B)
-                ),
-                shape = RoundedCornerShape(2.dp)
-            ) {
+            Button(onClick = onDevModeClick, colors = ButtonDefaults.buttonColors(containerColor = if (isDevMode) Color(0xFF15803D) else Color(0xFF991B1B)), shape = RoundedCornerShape(2.dp)) {
                 Text(if (isDevMode) "GOD ON" else "DEV OFF", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
             }
 
-            Box(
-                modifier = Modifier
-                    .border(1.dp, Color(0xFFFFB703), RoundedCornerShape(2.dp))
-                    .background(Color(0xFF0F172A))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
+            Box(modifier = Modifier.border(1.dp, Color(0xFFFFB703), RoundedCornerShape(2.dp)).background(Color(0xFF0F172A)).padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Text("CR: $coins", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = "SKINS",
-            color = Color(0xFF00E5FF),
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Black,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 4.sp
-        )
+        Text("SKINS", color = Color(0xFF00E5FF), fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, letterSpacing = 4.sp)
         Text("SELECIONE SEU CAÇA DE COMBATE", color = Color.Gray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth().weight(1f)
-        ) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
             items(availableSkins) { skin ->
                 val isUnlocked = unlockedSkins.contains(skin.id)
                 val isEquipped = selectedSkin.id == skin.id
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF080D1A))
-                        .border(
-                            width = if (isEquipped) 2.dp else 1.dp,
-                            color = if (isEquipped) skin.primaryColor else Color(0xFF1E293B),
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                        .padding(12.dp)
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF080D1A)).border(width = if (isEquipped) 2.dp else 1.dp, color = if (isEquipped) skin.primaryColor else Color(0xFF1E293B), shape = RoundedCornerShape(2.dp)).padding(12.dp)) {
                     Column {
-                        Text(
-                            text = skin.name.uppercase(),
-                            color = Color.White,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 15.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-
+                        Text(skin.name.uppercase(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp, fontFamily = FontFamily.Monospace)
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(85.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(85.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
+                        Row(modifier = Modifier.fillMaxWidth().height(85.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Box(modifier = Modifier.weight(1f).height(85.dp), contentAlignment = Alignment.CenterStart) {
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                     val bitmap = shipBitmaps[skin.id]
                                     if (bitmap != null) {
                                         rotate(degrees = skin.previewRotation, pivot = center) {
                                             val targetPx = 70.dp.toPx()
-                                            drawImage(
-                                                image = bitmap,
-                                                dstOffset = IntOffset(
-                                                    (center.x - targetPx / 2f).toInt(),
-                                                    (center.y - targetPx / 2f).toInt()
-                                                ),
-                                                dstSize = IntSize(targetPx.toInt(), targetPx.toInt()),
-                                                filterQuality = FilterQuality.None
-                                            )
+                                            drawImage(image = bitmap, dstOffset = IntOffset((center.x - targetPx / 2f).toInt(), (center.y - targetPx / 2f).toInt()), dstSize = IntSize(targetPx.toInt(), targetPx.toInt()), filterQuality = FilterQuality.None)
                                         }
                                     }
                                 }
                             }
 
-                            Column(
-                                horizontalAlignment = Alignment.End,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = skin.perkTitle.uppercase(),
-                                    color = skin.primaryColor,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Text(
-                                    text = skin.perkDescription,
-                                    color = Color.LightGray,
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-
+                            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
+                                Text(skin.perkTitle.uppercase(), color = skin.primaryColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text(skin.perkDescription, color = Color.LightGray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                                 Spacer(modifier = Modifier.height(4.dp))
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .background(Color(0xFF0F172A))
-                                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(2.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                Box(modifier = Modifier.size(38.dp).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(2.dp)), contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = when (skin.perk) {
+                                        when (skin.perk) {
                                             ShipPerk.BALANCED -> "❤️+"
                                             ShipPerk.RAPID_ASSAULT -> "⚡"
                                             ShipPerk.HEAVY_SHIELD -> "🛡️"
@@ -923,56 +650,19 @@ fun HangarScreen(
                                         fontSize = 16.sp
                                     )
                                 }
-
-                                Text(
-                                    text = "[${skin.perkTag}]",
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                                Text("[${skin.perkTag}]", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
                         if (isUnlocked) {
-                            Button(
-                                onClick = { onSelectSkin(skin) },
-                                enabled = !isEquipped,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(38.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isEquipped) Color(0xFF1E293B) else skin.primaryColor
-                                ),
-                                shape = RoundedCornerShape(2.dp)
-                            ) {
-                                Text(
-                                    text = if (isEquipped) "EQUIPADO" else "EQUIPAR",
-                                    color = if (isEquipped) Color.Gray else Color.Black,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                            Button(onClick = { onSelectSkin(skin) }, enabled = !isEquipped, modifier = Modifier.fillMaxWidth().height(38.dp), colors = ButtonDefaults.buttonColors(containerColor = if (isEquipped) Color(0xFF1E293B) else skin.primaryColor), shape = RoundedCornerShape(2.dp)) {
+                                Text(if (isEquipped) "EQUIPADO" else "EQUIPAR", color = if (isEquipped) Color.Gray else Color.Black, fontWeight = FontWeight.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                             }
                         } else {
-                            Button(
-                                onClick = { onBuySkin(skin) },
-                                enabled = coins >= skin.price,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(38.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
-                                shape = RoundedCornerShape(2.dp)
-                            ) {
-                                Text(
-                                    text = "${skin.price} CR // DESBLOQUEAR",
-                                    color = Color.Black,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                            Button(onClick = { onBuySkin(skin) }, enabled = coins >= skin.price, modifier = Modifier.fillMaxWidth().height(38.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)), shape = RoundedCornerShape(2.dp)) {
+                                Text("${skin.price} CR // DESBLOQUEAR", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
@@ -983,7 +673,7 @@ fun HangarScreen(
 }
 
 // -------------------------------------------------------------
-// GAMEPLAY COMPLETO (PARASITAS DE MERGULHO ATIVO E PERSISTENTE)
+// GAMEPLAY COMPLETO (BASE COMPROVADA E TOTALMENTE ESTABILIZADA)
 // -------------------------------------------------------------
 @Composable
 fun DynamicGamePlayScreen(
@@ -999,59 +689,29 @@ fun DynamicGamePlayScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
 
-    val shipBitmaps = remember {
-        availableSkins.associate { skin ->
-            skin.id to BitmapFactory.decodeResource(context.resources, skin.drawableRes).asImageBitmap()
-        }
-    }
+    val shipBitmaps = remember { availableSkins.associate { it.id to BitmapFactory.decodeResource(context.resources, it.drawableRes).asImageBitmap() } }
+    val powerUpBitmaps = remember { PowerUpType.values().associateWith { BitmapFactory.decodeResource(context.resources, it.drawableRes).asImageBitmap() } }
 
-    val powerUpBitmaps = remember {
-        PowerUpType.values().associateWith { type ->
-            BitmapFactory.decodeResource(context.resources, type.drawableRes).asImageBitmap()
-        }
-    }
+    val rusherBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.crab_rusher).asImageBitmap() }
+    val normalInvaderBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.invasor).asImageBitmap() }
+    val beetleShooterBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.alien_era0).asImageBitmap() }
+    val bossMothershipBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.spaceship_mae).asImageBitmap() }
 
-    // Sprites Era 0
-    val rusherBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.crab_rusher).asImageBitmap()
-    }
-    val normalInvaderBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.invasor).asImageBitmap()
-    }
-    val beetleShooterBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.alien_era0).asImageBitmap()
-    }
-    val bossMothershipBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.spaceship_mae).asImageBitmap()
-    }
+    val glaiveBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.glaive).asImageBitmap() }
+    val vespaBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.vespa_atirador).asImageBitmap() }
+    val arieteBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.ariete).asImageBitmap() }
+    val orbitalBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.orbital).asImageBitmap() }
 
-    // Sprites Era 1 (Fogo)
-    val glaiveBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.glaive).asImageBitmap()
-    }
-    val vespaBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.vespa_atirador).asImageBitmap()
-    }
-    val arieteBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.ariete).asImageBitmap()
-    }
-    val orbitalBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.orbital).asImageBitmap()
-    }
+    val parasitaBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.parasita).asImageBitmap() }
+    val insectoidBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.insectoid).asImageBitmap() }
+    val casuloBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.casulo).asImageBitmap() }
+    val serpentoidBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.serpentoid).asImageBitmap() }
 
-    // Sprites Era 2 (Bio-Verde)
-    val parasitaBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.parasita).asImageBitmap()
-    }
-    val insectoidBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.insectoid).asImageBitmap()
-    }
-    val casuloBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.casulo).asImageBitmap()
-    }
-    val serpentoidBitmap = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.serpentoid).asImageBitmap()
-    }
+    // Sprites Era 3 (Nomes estritos originais)
+    val vazioBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.vazio).asImageBitmap() }
+    val tesseractBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.tesseract).asImageBitmap() }
+    val enigmaBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.enigma_bom).asImageBitmap() }
+    val omegaBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.omega).asImageBitmap() }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val screenWidth = with(density) { maxWidth.toPx() }
@@ -1079,9 +739,8 @@ fun DynamicGamePlayScreen(
         var shipX by remember { mutableFloatStateOf(screenWidth / 2f - shipWidth / 2f) }
 
         var isTouchActive by remember { mutableStateOf(false) }
-
-        // Paralisia causada pelo Insectoid
         var paralyzeTimeLeft by remember { mutableLongStateOf(0L) }
+        var pinchWallWidth by remember { mutableFloatStateOf(0f) }
 
         var bossCurrentHp by remember { mutableIntStateOf(1) }
         var bossMaxHp by remember { mutableIntStateOf(1) }
@@ -1107,13 +766,14 @@ fun DynamicGamePlayScreen(
         var nextGlaiveDiveTime by remember { mutableLongStateOf(0L) }
         var nextSerpentMinionTime by remember { mutableLongStateOf(0L) }
         var nextAcidWallTime by remember { mutableLongStateOf(0L) }
+        var nextOmegaRingTime by remember { mutableLongStateOf(0L) }
 
         val bullets = remember { mutableListOf<Bullet>() }
         val enemies = remember { mutableListOf<Enemy>() }
         val powerUps = remember { mutableListOf<PowerUp>() }
         val particles = remember { mutableListOf<Particle>() }
         val stars = remember {
-            List(35) {
+            List(30) {
                 Star(
                     x = Random.nextFloat() * screenWidth,
                     y = Random.nextFloat() * screenHeight,
@@ -1130,13 +790,14 @@ fun DynamicGamePlayScreen(
         val currentEra = (currentWave - 1) / 5
         val isFireEra = (currentEra % 4) == 1
         val isBioEra = (currentEra % 4) == 2
+        val isVoidEra = (currentEra % 4) == 3
 
         val backgroundBrush = remember(currentEra) {
             when (currentEra % 4) {
                 0 -> Brush.verticalGradient(listOf(Color(0xFF030712), Color(0xFF0B192C), Color(0xFF020617)))
                 1 -> Brush.verticalGradient(listOf(Color(0xFF1F0D00), Color(0xFF3D1600), Color(0xFF0F0500)))
                 2 -> Brush.verticalGradient(listOf(Color(0xFF021B14), Color(0xFF053828), Color(0xFF01140E)))
-                else -> Brush.verticalGradient(listOf(Color(0xFF1E0738), Color(0xFF2E0854), Color(0xFF0D021A)))
+                else -> Brush.verticalGradient(listOf(Color(0xFF140226), Color(0xFF2E0854), Color(0xFF0B0118)))
             }
         }
 
@@ -1148,30 +809,16 @@ fun DynamicGamePlayScreen(
             audioEngine.playBomb()
 
             bullets.removeAll { it.isEnemy }
-
-            activeRushers.forEach { rusher ->
-                repeat(14) {
-                    particles.add(
-                        Particle(
-                            x = rusher.x + rusherSize / 2f,
-                            y = rusher.y + rusherSize / 2f,
-                            vx = (Random.nextFloat() - 0.5f) * 12f,
-                            vy = (Random.nextFloat() - 0.5f) * 12f,
-                            color = Color(0xFF00F5D4)
-                        )
-                    )
-                }
-            }
             activeRushers.clear()
 
-            repeat(24) {
+            repeat(20) {
                 particles.add(
                     Particle(
                         x = shipX + shipWidth / 2f,
                         y = shipY + shipHeight / 2f,
                         vx = (Random.nextFloat() - 0.5f) * 14f,
                         vy = (Random.nextFloat() - 0.5f) * 14f,
-                        color = Color(0xFF00E5FF)
+                        color = Color(0xFFD946EF)
                     )
                 )
             }
@@ -1182,6 +829,7 @@ fun DynamicGamePlayScreen(
             bullets.clear()
             powerUps.clear()
             activeRushers.clear()
+            pinchWallWidth = 0f
 
             if (equippedSkin.perk == ShipPerk.HEAVY_SHIELD) {
                 hasShield = true
@@ -1191,6 +839,7 @@ fun DynamicGamePlayScreen(
             val waveEra = (wave - 1) / 5
             val waveIsFire = (waveEra % 4) == 1
             val waveIsBio = (waveEra % 4) == 2
+            val waveIsVoid = (waveEra % 4) == 3
 
             if (isBossWave) {
                 audioEngine.playBossAlarm()
@@ -1198,13 +847,13 @@ fun DynamicGamePlayScreen(
                     1 -> BossType.MOTHERSHIP
                     2 -> BossType.DREADNOUGHT
                     3 -> BossType.SERPENTOID
-                    else -> BossType.OVERLORD
+                    else -> BossType.OMEGA
                 }
                 val bossHp = when (bossType) {
                     BossType.MOTHERSHIP -> 45 + (wave * 12)
                     BossType.DREADNOUGHT -> 60 + (wave * 8)
                     BossType.SERPENTOID -> 75 + (wave * 10)
-                    else -> 50 + (wave * 15)
+                    else -> 100 + (wave * 15)
                 }
 
                 bossCurrentHp = bossHp
@@ -1218,9 +867,9 @@ fun DynamicGamePlayScreen(
                             BossType.MOTHERSHIP -> Color(0xFFFF0055)
                             BossType.DREADNOUGHT -> Color(0xFFFFB703)
                             BossType.SERPENTOID -> Color(0xFF10B981)
-                            BossType.OVERLORD -> Color(0xFFFF007F)
+                            BossType.OMEGA -> Color(0xFFD946EF)
                         },
-                        points = 1000 * (wave / 5),
+                        points = 2000 * (wave / 5),
                         isBoss = true,
                         bossType = bossType,
                         hp = bossHp,
@@ -1238,10 +887,15 @@ fun DynamicGamePlayScreen(
                 for (r in 0 until rows) {
                     for (c in 0 until cols) {
                         val kind = when {
+                            waveIsVoid -> when (r) {
+                                0 -> EnemyKind.ERA_VOID_PRISMA
+                                1 -> EnemyKind.ERA_VOID_TESSERACT
+                                else -> EnemyKind.ERA_VOID_ENIGMA
+                            }
                             waveIsBio -> when (r) {
-                                0 -> EnemyKind.ERA_BIO_INSECTOID // Topo: Cospe teia paralisante[cite: 14]
-                                1 -> EnemyKind.ERA_BIO_CASULO    // Meio: Casulo tanque de 3 HP com estilhaços[cite: 15]
-                                else -> EnemyKind.ERA_BIO_PARASITA // Frente: Parasitas predadores de ataque[cite: 13]
+                                0 -> EnemyKind.ERA_BIO_INSECTOID
+                                1 -> EnemyKind.ERA_BIO_CASULO
+                                else -> EnemyKind.ERA_BIO_PARASITA
                             }
                             waveIsFire -> when (r) {
                                 0 -> EnemyKind.ERA_FIRE_VESPA
@@ -1252,9 +906,9 @@ fun DynamicGamePlayScreen(
                         }
 
                         val enemyHp = when (kind) {
+                            EnemyKind.ERA_VOID_TESSERACT -> 4
                             EnemyKind.ERA_BIO_CASULO -> 3
-                            EnemyKind.ERA_FIRE_ARIETE -> 2
-                            EnemyKind.BEETLE_SHOOTER -> 2
+                            EnemyKind.ERA_FIRE_ARIETE, EnemyKind.BEETLE_SHOOTER -> 2
                             else -> 1
                         }
 
@@ -1262,7 +916,7 @@ fun DynamicGamePlayScreen(
                             Enemy(
                                 x = startX + c * spacing,
                                 y = waveStartY + r * spacing,
-                                points = if (kind == EnemyKind.ERA_BIO_CASULO) 45 + wave * 5 else 20 + wave * 5,
+                                points = 35 + wave * 5,
                                 kind = kind,
                                 hp = enemyHp,
                                 maxHp = enemyHp,
@@ -1283,6 +937,7 @@ fun DynamicGamePlayScreen(
             nextGlaiveDiveTime = System.nanoTime() + 10_000_000_000L
             nextSerpentMinionTime = System.nanoTime() + 6_000_000_000L
             nextAcidWallTime = System.nanoTime() + 8_000_000_000L
+            nextOmegaRingTime = System.nanoTime() + 6_000_000_000L
 
             while (isDevGodMode || lives > 0) {
                 withFrameNanos { timeNow ->
@@ -1321,33 +976,78 @@ fun DynamicGamePlayScreen(
                     val pendingBullets = mutableListOf<Bullet>()
                     val pendingEnemies = mutableListOf<Enemy>()
 
-                    // Krab Rusher apenas na Era 0
                     val isBossWave = currentWave % 5 == 0
-                    val isEra0 = currentEra == 0
+                    val isEra0 = currentWave <= 5
 
+                    // 1. Enigma Intangibilidade
+                    if (isVoidEra && !isFrozen) {
+                        for (i in enemies.indices) {
+                            val e = enemies[i]
+                            if (e.kind == EnemyKind.ERA_VOID_ENIGMA) {
+                                e.isPhasedOut = (sin((frameTick + e.swayOffset * 10f) * 0.045f) > 0.35f)
+                            }
+                        }
+                    }
+
+                    // 2. Boss Ômega (<50% HP Barreira Anular + Pinça)
+                    val omegaBoss = enemies.firstOrNull { it.isBoss && it.bossType == BossType.OMEGA }
+                    if (omegaBoss != null && !isFrozen) {
+                        val isBelowHalf = omegaBoss.hp < (omegaBoss.maxHp / 2)
+                        if (isBelowHalf) {
+                            val maxPinch = screenWidth * 0.18f
+                            pinchWallWidth = (pinchWallWidth + 0.25f * timeScale).coerceAtMost(maxPinch)
+
+                            if (timeNow >= nextOmegaRingTime) {
+                                val totalSlots = 8
+                                val safeSlot = Random.nextInt(1, totalSlots - 1)
+                                val slotW = (screenWidth - lateralPadding * 2) / totalSlots
+
+                                for (col in 0 until totalSlots) {
+                                    if (col == safeSlot) continue
+                                    val bx = lateralPadding + (col * slotW) + (slotW / 2f)
+                                    pendingBullets.add(Bullet(x = bx, y = omegaBoss.y + bossHeight, vx = 0f, vy = 8f * timeScale, isEnemy = true))
+                                }
+                                shakeIntensity = 10f
+                                audioEngine.playExplosion()
+                                nextOmegaRingTime = timeNow + 5_000_000_000L
+                            }
+                        }
+                    }
+
+                    // 3. Boss Serpentoid (Parasitas mergulhadores)
+                    val serpentBoss = enemies.firstOrNull { it.isBoss && it.bossType == BossType.SERPENTOID }
+                    if (serpentBoss != null && !isFrozen) {
+                        if (timeNow >= nextSerpentMinionTime) {
+                            pendingEnemies.add(Enemy(x = serpentBoss.x + 20f, y = serpentBoss.y + bossHeight * 0.7f, kind = EnemyKind.ERA_BIO_PARASITA, hp = 1, maxHp = 1, isDiving = true, diveVx = -5f))
+                            pendingEnemies.add(Enemy(x = serpentBoss.x + bossWidth - 50f, y = serpentBoss.y + bossHeight * 0.7f, kind = EnemyKind.ERA_BIO_PARASITA, hp = 1, maxHp = 1, isDiving = true, diveVx = 5f))
+                            audioEngine.playPowerUp()
+                            nextSerpentMinionTime = timeNow + 6_500_000_000L
+                        }
+
+                        val isBelowHalfHp = serpentBoss.hp < (serpentBoss.maxHp / 2)
+                        if (isBelowHalfHp && timeNow >= nextAcidWallTime) {
+                            val totalSlots = 8
+                            val safeHoleIndex = Random.nextInt(1, totalSlots - 1)
+                            val slotWidth = (screenWidth - lateralPadding * 2) / totalSlots
+
+                            for (col in 0 until totalSlots) {
+                                if (col == safeHoleIndex) continue
+                                val bulletX = lateralPadding + (col * slotWidth) + (slotWidth / 2f)
+                                pendingBullets.add(Bullet(x = bulletX, y = serpentBoss.y + bossHeight, vx = 0f, vy = 7.5f * timeScale, isEnemy = true))
+                            }
+                            shakeIntensity = 7f
+                            audioEngine.playExplosion()
+                            nextAcidWallTime = timeNow + 5_500_000_000L
+                        }
+                    }
+
+                    // Krab Rusher apenas na Era 0
                     if (isEra0 && !isBossWave && activeRushers.isEmpty() && timeNow >= nextRusherSpawnTime) {
                         val leftX = lateralPadding
                         val rightX = screenWidth - rusherSize - lateralPadding
 
-                        activeRushers.add(
-                            RusherEnemy(
-                                x = leftX,
-                                y = -rusherSize,
-                                hp = 2,
-                                vx = Random.nextFloat() * 2.2f + 1.2f,
-                                vy = Random.nextFloat() * 2.5f + 8.0f
-                            )
-                        )
-                        activeRushers.add(
-                            RusherEnemy(
-                                x = rightX,
-                                y = -rusherSize - 110f,
-                                hp = 2,
-                                vx = -(Random.nextFloat() * 2.2f + 1.2f),
-                                vy = Random.nextFloat() * 2.5f + 8.5f
-                            )
-                        )
-
+                        activeRushers.add(RusherEnemy(leftX, -rusherSize, hp = 2, vx = Random.nextFloat() * 2.2f + 1.2f, vy = Random.nextFloat() * 2.5f + 8.0f))
+                        activeRushers.add(RusherEnemy(rightX, -rusherSize - 110f, hp = 2, vx = -(Random.nextFloat() * 2.2f + 1.2f), vy = Random.nextFloat() * 2.5f + 8.5f))
                         nextRusherSpawnTime = timeNow + Random.nextLong(12_000_000_000L, 17_000_000_000L)
                     }
 
@@ -1356,7 +1056,6 @@ fun DynamicGamePlayScreen(
                         while (rIter.hasNext()) {
                             val rusher = rIter.next()
                             rusher.swayOffset += 0.08f * timeScale
-
                             rusher.y += rusher.vy * timeScale
                             rusher.x += (rusher.vx + sin(rusher.swayOffset) * 2.6f) * timeScale
 
@@ -1377,21 +1076,10 @@ fun DynamicGamePlayScreen(
                                 if (!isDevGodMode) {
                                     if (hasShield) hasShield = false else lives--
                                 }
-
-                                repeat(12) {
-                                    particles.add(
-                                        Particle(
-                                            rusher.x + rusherSize / 2f,
-                                            rusher.y + rusherSize / 2f,
-                                            (Random.nextFloat() - 0.5f) * 11f,
-                                            (Random.nextFloat() - 0.5f) * 11f,
-                                            color = Color(0xFF00F5D4),
-                                            size = 4f
-                                        )
-                                    )
+                                repeat(10) {
+                                    particles.add(Particle(rusher.x + rusherSize / 2f, rusher.y + rusherSize / 2f, (Random.nextFloat() - 0.5f) * 10f, (Random.nextFloat() - 0.5f) * 10f, color = Color(0xFF00F5D4)))
                                 }
                                 rIter.remove()
-
                                 if (!isDevGodMode && lives <= 0) {
                                     onGameOver(score, currentWave)
                                     return@withFrameNanos
@@ -1412,71 +1100,12 @@ fun DynamicGamePlayScreen(
                         nextGlaiveDiveTime = timeNow + Random.nextLong(10_000_000_000L, 15_000_000_000L)
                     }
 
-                    // -------------------------------------------------------------
-                    // HABILIDADES DO BOSS SERPENTOID
-                    // -------------------------------------------------------------
-                    val serpentBoss = enemies.firstOrNull { it.isBoss && it.bossType == BossType.SERPENTOID }
-                    if (serpentBoss != null && !isFrozen) {
-                        // 1. Invoca Parasitas que descem em ataque direto
-                        if (timeNow >= nextSerpentMinionTime) {
-                            pendingEnemies.add(
-                                Enemy(
-                                    x = serpentBoss.x + 20f,
-                                    y = serpentBoss.y + bossHeight * 0.7f,
-                                    kind = EnemyKind.ERA_BIO_PARASITA,
-                                    hp = 1,
-                                    maxHp = 1,
-                                    era = currentEra
-                                )
-                            )
-                            pendingEnemies.add(
-                                Enemy(
-                                    x = serpentBoss.x + bossWidth - 50f,
-                                    y = serpentBoss.y + bossHeight * 0.7f,
-                                    kind = EnemyKind.ERA_BIO_PARASITA,
-                                    hp = 1,
-                                    maxHp = 1,
-                                    era = currentEra
-                                )
-                            )
-                            audioEngine.playPowerUp()
-                            nextSerpentMinionTime = timeNow + 7_500_000_000L
-                        }
-
-                        // 2. Com menos da metade da vida (< 50%), solta Parede de Ácido com Brecha Segura
-                        val isBelowHalfHp = serpentBoss.hp < (serpentBoss.maxHp / 2)
-                        if (isBelowHalfHp && timeNow >= nextAcidWallTime) {
-                            val totalSlots = 8
-                            val safeHoleIndex = Random.nextInt(1, totalSlots - 1)
-                            val slotWidth = (screenWidth - lateralPadding * 2) / totalSlots
-
-                            for (col in 0 until totalSlots) {
-                                if (col == safeHoleIndex) continue
-                                val bulletX = lateralPadding + (col * slotWidth) + (slotWidth / 2f)
-                                pendingBullets.add(
-                                    Bullet(
-                                        x = bulletX,
-                                        y = serpentBoss.y + bossHeight,
-                                        vx = 0f,
-                                        vy = 7.5f * timeScale,
-                                        isEnemy = true
-                                    )
-                                )
-                            }
-                            shakeIntensity = 7f
-                            audioEngine.playExplosion()
-                            nextAcidWallTime = timeNow + 5_500_000_000L
-                        }
-                    }
-
                     // Tiro do Jogador
                     val baseInterval = if (equippedSkin.perk == ShipPerk.RAPID_ASSAULT) 120_000_000L else 170_000_000L
                     val isRapid = timeNow < rapidFireTimeLeft
                     val finalShotInterval = if (isRapid) (baseInterval * 0.55f).toLong() else baseInterval
-
-                    val isDamageBoosted = timeNow < damageBoostTimeLeft
                     val baseDamage = if (equippedSkin.perk == ShipPerk.DOUBLE_DAMAGE) 2 else 1
-                    val finalDamage = if (isDamageBoosted) baseDamage * 2 else baseDamage
+                    val finalDamage = if (timeNow < damageBoostTimeLeft) baseDamage * 2 else baseDamage
 
                     if (isTouchActive && timeNow - lastPlayerShotTime > finalShotInterval) {
                         val originX = shipX + shipWidth / 2f
@@ -1485,16 +1114,8 @@ fun DynamicGamePlayScreen(
                         lastPlayerShotTime = timeNow
                     }
 
-                    // -------------------------------------------------------------
-                    // CADÊNCIA INIMIGA (PARASITAS NÃO ATIRAM PARADOS)
-                    // -------------------------------------------------------------
-                    val baseEnemyInterval = when {
-                        isBioEra -> 650_000_000L
-                        isFireEra -> 680_000_000L
-                        else -> 550_000_000L
-                    }
-
-                    // Filtramos apenas os que atiram (excluindo os parasitas)
+                    // Cadência Inimiga
+                    val baseEnemyInterval = if (isVoidEra) 520_000_000L else 600_000_000L
                     val potentialShooters = enemies.filter { it.isBoss || it.kind != EnemyKind.ERA_BIO_PARASITA }
 
                     if (!isFrozen && timeNow - lastEnemyShotTime > (baseEnemyInterval / timeScale).toLong() && potentialShooters.isNotEmpty()) {
@@ -1515,25 +1136,47 @@ fun DynamicGamePlayScreen(
                                 BossType.SERPENTOID -> {
                                     val sway = sin(boss.swayOffset * 2f) * 4f
                                     pendingBullets.add(Bullet(boss.x + bossWidth / 2f, boss.y + bossHeight * 0.85f, vx = sway * timeScale, vy = 13.5f * timeScale, isEnemy = true, isParalyzing = true))
-                                    pendingBullets.add(Bullet(boss.x + 30f, boss.y + bossHeight * 0.80f, vx = -3.8f * timeScale, vy = 11f * timeScale, isEnemy = true))
-                                    pendingBullets.add(Bullet(boss.x + bossWidth - 30f, boss.y + bossHeight * 0.80f, vx = 3.8f * timeScale, vy = 11f * timeScale, isEnemy = true))
                                 }
-                                BossType.OVERLORD -> {
-                                    val sway = sin(boss.swayOffset) * 5f
-                                    pendingBullets.add(Bullet(boss.x + bossWidth / 2f, boss.y + bossHeight * 0.85f, vx = sway * timeScale, vy = 10.5f * timeScale, isEnemy = true))
+                                BossType.OMEGA -> {
+                                    val originX = boss.x + bossWidth / 2f
+                                    val originY = boss.y + bossHeight * 0.88f
+                                    val targetCenterX = shipX + shipWidth / 2f
+                                    val aimDx = ((targetCenterX - originX) * 0.018f).coerceIn(-3.5f, 3.5f)
+                                    val waveSweep = sin(boss.swayOffset * 1.8f) * 1.6f
+
+                                    for (i in -2..2) {
+                                        val spread = i * (2.8f + Random.nextFloat() * 0.8f)
+                                        val jitterVx = (Random.nextFloat() - 0.5f) * 1.4f
+                                        val bulletVx = (spread + aimDx + waveSweep + jitterVx) * timeScale
+
+                                        val baseVy = 13.5f - kotlin.math.abs(i) * 0.9f
+                                        val jitterVy = (Random.nextFloat() - 0.5f) * 1.2f
+                                        val bulletVy = (baseVy + jitterVy) * timeScale
+
+                                        pendingBullets.add(Bullet(originX, originY, vx = bulletVx, vy = bulletVy, isEnemy = true))
+                                    }
                                 }
                             }
                         } else {
                             val shooter = potentialShooters.random()
                             when (shooter.kind) {
+                                EnemyKind.ERA_VOID_PRISMA -> {
+                                    pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = -1.8f * timeScale, vy = 11f * timeScale, isEnemy = true))
+                                    pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = 1.8f * timeScale, vy = 11f * timeScale, isEnemy = true))
+                                }
+                                EnemyKind.ERA_VOID_ENIGMA -> {
+                                    pendingBullets.add(Bullet(shooter.x + 8f, shooter.y + enemySize, vx = 0f, vy = 12f * timeScale, isEnemy = true))
+                                    pendingBullets.add(Bullet(shooter.x + enemySize - 8f, shooter.y + enemySize, vx = 0f, vy = 12f * timeScale, isEnemy = true))
+                                }
+                                EnemyKind.ERA_VOID_TESSERACT -> {
+                                    pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = 0f, vy = 13.5f * timeScale, isEnemy = true))
+                                }
                                 EnemyKind.ERA_BIO_INSECTOID -> {
-                                    // Insectoid cospe teia paralisante teleguiada
                                     val dx = (shipX + shipWidth / 2f) - (shooter.x + enemySize / 2f)
                                     val aimVx = (dx * 0.025f).coerceIn(-3.5f, 3.5f)
                                     pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = aimVx * timeScale, vy = 11.5f * timeScale, isEnemy = true, isParalyzing = true))
                                 }
                                 EnemyKind.ERA_BIO_CASULO -> {
-                                    // Casulo dispara tiro ácido direto
                                     pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = 0f, vy = 14f * timeScale, isEnemy = true))
                                 }
                                 EnemyKind.ERA_FIRE_GLAIVE -> {
@@ -1548,8 +1191,7 @@ fun DynamicGamePlayScreen(
                                     pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = 0f, vy = 12f * timeScale, isEnemy = true))
                                 }
                                 else -> {
-                                    val bulletSpeed = if (shooter.kind == EnemyKind.BEETLE_SHOOTER) 12f else 10f
-                                    pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = 0f, vy = bulletSpeed * timeScale, isEnemy = true))
+                                    pendingBullets.add(Bullet(shooter.x + enemySize / 2f, shooter.y + enemySize, vx = 0f, vy = 11f * timeScale, isEnemy = true))
                                 }
                             }
                         }
@@ -1586,28 +1228,19 @@ fun DynamicGamePlayScreen(
                         }
                     }
 
-                    // -------------------------------------------------------------
-                    // MOVIMENTO E COMPORTAMENTO ATIVO DO PARASITA
-                    // -------------------------------------------------------------
                     if (!isFrozen) {
                         val isBossPresent = enemies.any { it.isBoss }
                         if (isBossPresent) {
                             val boss = enemies.first { it.isBoss }
-                            if (boss.bossType == BossType.SERPENTOID) {
-                                boss.swayOffset += 0.055f * timeScale
-                                boss.x += (cos(boss.swayOffset) * 4.2f) * timeScale
-                                boss.y = bossTopY + sin(boss.swayOffset * 1.4f) * 22f
-                            } else {
-                                boss.x += ((2.4f + currentWave * 0.10f) * timeScale) * enemyDir
-                                boss.y = bossTopY + sin(boss.swayOffset) * 16f
-                                boss.swayOffset += 0.035f * timeScale
-                            }
+                            boss.swayOffset += 0.05f * timeScale
+                            boss.x += (cos(boss.swayOffset) * 4.2f) * timeScale
+                            boss.y = bossTopY + sin(boss.swayOffset * 1.4f) * 18f
 
-                            if (boss.x <= lateralPadding) {
-                                boss.x = lateralPadding
+                            if (boss.x <= lateralPadding + pinchWallWidth) {
+                                boss.x = lateralPadding + pinchWallWidth
                                 enemyDir = 1f
-                            } else if (boss.x >= screenWidth - bossWidth - lateralPadding) {
-                                boss.x = screenWidth - bossWidth - lateralPadding
+                            } else if (boss.x >= screenWidth - bossWidth - lateralPadding - pinchWallWidth) {
+                                boss.x = screenWidth - bossWidth - lateralPadding - pinchWallWidth
                                 enemyDir = -1f
                             }
                         } else {
@@ -1620,87 +1253,43 @@ fun DynamicGamePlayScreen(
                                 e1.swayOffset += e1.swaySpeed * timeScale
 
                                 if (e1.kind == EnemyKind.ERA_BIO_PARASITA) {
-                                    // PARASITA ATIVO: Persegue continuamente a nave
-                                    e1.y += (6.8f + currentWave * 0.15f) * timeScale
-
+                                    e1.y += (7.2f + currentWave * 0.15f) * timeScale
                                     val targetCenterX = shipX + shipWidth / 2f
                                     val myCenterX = e1.x + enemySize / 2f
-                                    val dirToPlayer = (targetCenterX - myCenterX) * 0.035f
-
-                                    // Adiciona oscilação orgânica das asas
-                                    e1.x += (dirToPlayer + sin(e1.swayOffset * 3f) * 3.5f) * timeScale
-
-                                    // Se passar da tela, reaparece no topo para atacar de novo
+                                    e1.x += ((targetCenterX - myCenterX) * 0.04f + sin(e1.swayOffset * 3f) * 3.5f) * timeScale
                                     if (e1.y > screenHeight) {
                                         e1.y = 80f
                                         e1.x = Random.nextFloat() * (screenWidth - enemySize - lateralPadding * 2) + lateralPadding
                                     }
-                                } else if (e1.isDiving) {
-                                    e1.y += 8.2f * timeScale
-                                    e1.x += (sin(e1.swayOffset * 2f) * 5.0f + e1.diveVx) * timeScale
-                                    if (e1.y > screenHeight) {
-                                        e1.y = 80f
-                                        e1.isDiving = false
-                                    }
-                                } else {
+                                } else if (!e1.isBoss) {
                                     when (e1.kind) {
-                                        EnemyKind.ERA_BIO_CASULO -> {
-                                            e1.x += (baseSpeedX * 0.65f * enemyDir)
-                                            e1.y += constantFallSpeed * 0.8f
+                                        EnemyKind.ERA_VOID_ENIGMA -> {
+                                            e1.x += (baseSpeedX * 1.3f * enemyDir) + sin(e1.swayOffset * 3f) * 4f
+                                            e1.y += constantFallSpeed * 1.15f
                                         }
-                                        EnemyKind.ERA_BIO_INSECTOID -> {
-                                            e1.x += (baseSpeedX * 1.0f * enemyDir) + cos(e1.swayOffset * 1.3f) * 1.8f
-                                            e1.y += constantFallSpeed * 0.75f
-                                        }
-                                        EnemyKind.ERA_FIRE_GLAIVE -> {
-                                            e1.x += (baseSpeedX * 1.15f * enemyDir) + sin(e1.swayOffset * 1.2f) * 2.0f
-                                            e1.y += constantFallSpeed * 1.1f
-                                        }
-                                        EnemyKind.ERA_FIRE_ARIETE -> {
-                                            e1.x += (baseSpeedX * 0.7f * enemyDir)
-                                            e1.y += constantFallSpeed * 0.85f
-                                            e1.hasShield = (sin(frameTick * 0.04f) > 0.0f)
-                                        }
-                                        EnemyKind.ERA_FIRE_VESPA -> {
-                                            e1.x += (baseSpeedX * 1.0f * enemyDir) + cos(e1.swayOffset * 1.5f) * 1.6f
+                                        EnemyKind.ERA_VOID_TESSERACT -> {
+                                            e1.x += (baseSpeedX * 0.55f * enemyDir)
                                             e1.y += constantFallSpeed * 0.7f
                                         }
+                                        EnemyKind.ERA_VOID_PRISMA -> {
+                                            e1.x += (baseSpeedX * 1.05f * enemyDir)
+                                            e1.y += constantFallSpeed * 0.9f
+                                        }
                                         else -> {
-                                            val randomSway = sin(e1.swayOffset) * e1.swayAmplitude
-                                            e1.x += (baseSpeedX * enemyDir) + randomSway
+                                            e1.x += (baseSpeedX * enemyDir) + sin(e1.swayOffset) * e1.swayAmplitude
                                             e1.y += constantFallSpeed
                                         }
                                     }
                                 }
 
-                                if (e1.y >= shipY + shipHeight && !e1.isDiving && e1.kind != EnemyKind.ERA_BIO_PARASITA) e1.y = 80f
+                                if (e1.y >= shipY + shipHeight && !e1.isBoss && e1.kind != EnemyKind.ERA_BIO_PARASITA) e1.y = 80f
 
-                                if (e1.x <= lateralPadding) {
+                                if (e1.x <= lateralPadding && !e1.isBoss) {
                                     e1.x = lateralPadding
                                     wallHit = true
-                                    if (e1.isDiving) e1.diveVx = kotlin.math.abs(e1.diveVx)
-                                } else if (e1.x >= screenWidth - enemySize - lateralPadding) {
+                                } else if (e1.x >= screenWidth - enemySize - lateralPadding && !e1.isBoss) {
                                     e1.x = screenWidth - enemySize - lateralPadding
                                     wallHit = true
-                                    if (e1.isDiving) e1.diveVx = -kotlin.math.abs(e1.diveVx)
-                                }
-
-                                for (j in i + 1 until enemies.size) {
-                                    val e2 = enemies[j]
-                                    val dx = e2.x - e1.x
-                                    val dy = e2.y - e1.y
-                                    val dist = sqrt(dx * dx + dy * dy)
-                                    val minDistance = enemySize + 6f
-
-                                    if (dist < minDistance && dist > 0f) {
-                                        val overlap = (minDistance - dist) * 0.5f
-                                        val nx = dx / dist
-                                        val ny = dy / dist
-                                        e1.x -= nx * overlap
-                                        e1.y -= ny * overlap
-                                        e2.x += nx * overlap
-                                        e2.y += ny * overlap
-                                    }
                                 }
                             }
 
@@ -1710,7 +1299,7 @@ fun DynamicGamePlayScreen(
                         }
                     }
 
-                    // Colisão com a nave
+                    // Colisão com nave
                     val shipRect = Rect(shipX, shipY, shipX + shipWidth, shipY + shipHeight)
                     val enemyIter = enemies.iterator()
                     while (enemyIter.hasNext()) {
@@ -1725,11 +1314,6 @@ fun DynamicGamePlayScreen(
                             if (!e.isBoss) enemyIter.remove()
                             audioEngine.playExplosion()
 
-                            if (particles.size < 25) {
-                                repeat(8) {
-                                    particles.add(Particle(shipX + shipWidth / 2f, shipY + shipHeight / 2f, (Random.nextFloat() - 0.5f) * 10f, (Random.nextFloat() - 0.5f) * 10f, color = Color(0xFFFF0055)))
-                                }
-                            }
                             if (!isDevGodMode && lives <= 0) {
                                 onGameOver(score, currentWave)
                                 return@withFrameNanos
@@ -1753,10 +1337,6 @@ fun DynamicGamePlayScreen(
                             }
 
                             audioEngine.playExplosion()
-                            if (particles.size < 25) {
-                                val hitColor = if (b.isParalyzing) Color(0xFF10B981) else Color(0xFFFF5555)
-                                repeat(6) { particles.add(Particle(b.x, b.y, (Random.nextFloat() - 0.5f) * 8f, (Random.nextFloat() - 0.5f) * 8f, color = hitColor)) }
-                            }
                             if (!isDevGodMode && lives <= 0) {
                                 onGameOver(score, currentWave)
                                 return@withFrameNanos
@@ -1770,97 +1350,59 @@ fun DynamicGamePlayScreen(
                         val b = playerBulletsIter.next()
                         if (b.isEnemy) continue
 
-                        var bulletHit = false
-
-                        val rIter = activeRushers.iterator()
-                        while (rIter.hasNext()) {
-                            val rusher = rIter.next()
-                            val rusherRect = Rect(rusher.x, rusher.y, rusher.x + rusherSize, rusher.y + rusherSize)
-                            if (rusherRect.contains(Offset(b.x, b.y))) {
-                                bulletHit = true
-                                rusher.hp -= b.damage
-                                if (rusher.hp <= 0) {
-                                    score += 50
-                                    audioEngine.playExplosion()
-                                    repeat(12) {
-                                        particles.add(
-                                            Particle(
-                                                rusher.x + rusherSize / 2f,
-                                                rusher.y + rusherSize / 2f,
-                                                (Random.nextFloat() - 0.5f) * 10f,
-                                                (Random.nextFloat() - 0.5f) * 10f,
-                                                color = Color(0xFF00F5D4),
-                                                size = 4f
-                                            )
-                                        )
-                                    }
-                                    rIter.remove()
-                                }
-                                break
-                            }
+                        // Tesseract gravitacional
+                        val activeTesseract = enemies.firstOrNull { it.kind == EnemyKind.ERA_VOID_TESSERACT }
+                        if (activeTesseract != null) {
+                            val pullDx = (activeTesseract.x + enemySize / 2f) - b.x
+                            b.x += (pullDx * 0.035f).coerceIn(-1.5f, 1.5f)
                         }
 
-                        if (!bulletHit) {
-                            val targetsIter = enemies.iterator()
-                            while (targetsIter.hasNext()) {
-                                val e = targetsIter.next()
-                                val w = if (e.isBoss) bossWidth else enemySize
-                                val h = if (e.isBoss) bossHeight else enemySize
+                        var bulletHit = false
+                        val targetsIter = enemies.iterator()
+                        while (targetsIter.hasNext()) {
+                            val e = targetsIter.next()
+                            val w = if (e.isBoss) bossWidth else enemySize
+                            val h = if (e.isBoss) bossHeight else enemySize
 
-                                if (Rect(e.x, e.y, e.x + w, e.y + h).contains(Offset(b.x, b.y))) {
-                                    bulletHit = true
+                            if (Rect(e.x, e.y, e.x + w, e.y + h).contains(Offset(b.x, b.y))) {
+                                bulletHit = true
 
-                                    if (e.kind == EnemyKind.ERA_FIRE_ARIETE && e.hasShield) {
-                                        repeat(6) {
-                                            particles.add(Particle(b.x, b.y, (Random.nextFloat() - 0.5f) * 6f, -Random.nextFloat() * 7f, color = Color(0xFFFFB703), size = 3f))
-                                        }
-                                        break
-                                    }
-
-                                    e.hp -= b.damage
-
-                                    if (e.isBoss) {
-                                        bossHitFlashTime = timeNow + 60_000_000L
-                                        bossCurrentHp = e.hp.coerceAtLeast(0)
-                                    }
-
-                                    if (e.kind == EnemyKind.ERA_BIO_CASULO && e.hp > 0) {
-                                        repeat(5) {
-                                            particles.add(Particle(b.x, b.y, (Random.nextFloat() - 0.5f) * 7f, (Random.nextFloat() - 0.5f) * 7f, color = Color(0xFF10B981), size = 3.5f))
-                                        }
-                                    }
-
-                                    if (e.hp <= 0) {
-                                        if (e.kind == EnemyKind.ERA_BIO_CASULO) {
-                                            pendingBullets.add(Bullet(e.x + w / 2f, e.y + h / 2f, vx = 0f, vy = 9f, isEnemy = true))
-                                            pendingBullets.add(Bullet(e.x + w / 2f, e.y + h / 2f, vx = -7f, vy = 6f, isEnemy = true))
-                                            pendingBullets.add(Bullet(e.x + w / 2f, e.y + h / 2f, vx = 7f, vy = 6f, isEnemy = true))
-                                        }
-
-                                        targetsIter.remove()
-                                        score += e.points
-                                        audioEngine.playExplosion()
-
-                                        val explosionColor = when (e.kind) {
-                                            EnemyKind.ERA_BIO_PARASITA, EnemyKind.ERA_BIO_CASULO, EnemyKind.ERA_BIO_INSECTOID -> Color(0xFF10B981)
-                                            EnemyKind.ERA_FIRE_GLAIVE -> Color(0xFFFF3D00)
-                                            else -> Color(0xFFFFB703)
-                                        }
-                                        val particleCount = if (e.isBoss) 20 else 8
-
-                                        if (particles.size < 35) {
-                                            repeat(particleCount) {
-                                                particles.add(Particle(e.x + w / 2f, e.y + h / 2f, (Random.nextFloat() - 0.5f) * 11f, (Random.nextFloat() - 0.5f) * 11f, color = explosionColor, size = if (e.isBoss) 5f else 3.5f))
-                                            }
-                                        }
-
-                                        val canDrop = if (e.isBoss) true else (Random.nextFloat() < 0.08f && powerUps.isEmpty())
-                                        if (canDrop) {
-                                            powerUps.add(PowerUp(e.x + w / 2f, e.y + h / 2f, PowerUpType.values().random()))
-                                        }
-                                    }
+                                // 1. Prisma Reflete o tiro frontal
+                                if (e.kind == EnemyKind.ERA_VOID_PRISMA) {
+                                    pendingBullets.add(Bullet(b.x, b.y, vx = (Random.nextFloat() - 0.5f) * 10f, vy = 15f, isEnemy = true))
+                                    audioEngine.playPowerUp()
                                     break
                                 }
+
+                                // 2. Enigma Intangível
+                                if (e.kind == EnemyKind.ERA_VOID_ENIGMA && e.isPhasedOut) {
+                                    repeat(2) { particles.add(Particle(b.x, b.y, (Random.nextFloat() - 0.5f) * 4f, (Random.nextFloat() - 0.5f) * 4f, color = Color(0xFFC084FC))) }
+                                    break
+                                }
+
+                                e.hp -= b.damage
+
+                                if (e.isBoss) {
+                                    bossHitFlashTime = timeNow + 60_000_000L
+                                    bossCurrentHp = e.hp.coerceAtLeast(0)
+                                }
+
+                                if (e.hp <= 0) {
+                                    targetsIter.remove()
+                                    score += e.points
+                                    audioEngine.playExplosion()
+
+                                    val explosionColor = if (isVoidEra) Color(0xFFD946EF) else Color(0xFF10B981)
+                                    repeat(if (e.isBoss) 16 else 6) {
+                                        particles.add(Particle(e.x + w / 2f, e.y + h / 2f, (Random.nextFloat() - 0.5f) * 10f, (Random.nextFloat() - 0.5f) * 10f, color = explosionColor))
+                                    }
+
+                                    val canDrop = if (e.isBoss) true else (Random.nextFloat() < 0.08f && powerUps.isEmpty())
+                                    if (canDrop) {
+                                        powerUps.add(PowerUp(e.x + w / 2f, e.y + h / 2f, PowerUpType.values().random()))
+                                    }
+                                }
+                                break
                             }
                         }
 
@@ -1869,11 +1411,9 @@ fun DynamicGamePlayScreen(
 
                     if (pendingBullets.isNotEmpty()) {
                         bullets.addAll(pendingBullets)
-                        pendingBullets.clear()
                     }
                     if (pendingEnemies.isNotEmpty()) {
                         enemies.addAll(pendingEnemies)
-                        pendingEnemies.clear()
                     }
 
                     val partIter = particles.iterator()
@@ -1881,7 +1421,7 @@ fun DynamicGamePlayScreen(
                         val p = partIter.next()
                         p.x += p.vx
                         p.y += p.vy
-                        p.alpha -= 0.05f
+                        p.alpha -= 0.06f
                         if (p.alpha <= 0f) partIter.remove()
                     }
 
@@ -1913,7 +1453,7 @@ fun DynamicGamePlayScreen(
 
                         val isParalyzed = System.nanoTime() < paralyzeTimeLeft
                         if (!isParalyzed) {
-                            shipX = (down.position.x - shipWidth / 2f).coerceIn(lateralPadding, screenWidth - shipWidth - lateralPadding)
+                            shipX = (down.position.x - shipWidth / 2f).coerceIn(lateralPadding + pinchWallWidth, screenWidth - shipWidth - lateralPadding - pinchWallWidth)
                         }
 
                         do {
@@ -1922,7 +1462,7 @@ fun DynamicGamePlayScreen(
                                 if (change.pressed) {
                                     val currentlyParalyzed = System.nanoTime() < paralyzeTimeLeft
                                     if (!currentlyParalyzed) {
-                                        shipX = (change.position.x - shipWidth / 2f).coerceIn(lateralPadding, screenWidth - shipWidth - lateralPadding)
+                                        shipX = (change.position.x - shipWidth / 2f).coerceIn(lateralPadding + pinchWallWidth, screenWidth - shipWidth - lateralPadding - pinchWallWidth)
                                     }
                                     change.consume()
                                 }
@@ -1948,6 +1488,19 @@ fun DynamicGamePlayScreen(
 
                 if (timeNow < paralyzeTimeLeft) {
                     drawRect(Color(0xFF10B981).copy(alpha = 0.20f), size = size)
+                }
+
+                if (pinchWallWidth > 0f) {
+                    drawRect(
+                        brush = Brush.horizontalGradient(listOf(Color(0xFF8B5CF6).copy(alpha = 0.6f), Color.Transparent)),
+                        topLeft = Offset(0f, 0f),
+                        size = Size(pinchWallWidth + lateralPadding, screenHeight)
+                    )
+                    drawRect(
+                        brush = Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFF8B5CF6).copy(alpha = 0.6f))),
+                        topLeft = Offset(screenWidth - pinchWallWidth - lateralPadding, 0f),
+                        size = Size(pinchWallWidth + lateralPadding, screenHeight)
+                    )
                 }
 
                 for (i in powerUps.indices) {
@@ -2000,21 +1553,24 @@ fun DynamicGamePlayScreen(
                                     )
                                 }
                             }
-                            else -> {
-                                val pulse = (sin(frameTick * 0.1f) * 3f).toFloat()
-                                val bossColor = if (isFlashing) Color.White else e.color
-                                drawRoundRect(
-                                    color = bossColor,
-                                    topLeft = Offset(e.x, e.y),
-                                    size = Size(bossWidth, bossHeight),
-                                    cornerRadius = CornerRadius(2f, 2f)
-                                )
-                                drawCircle(Color.White, radius = 16f + pulse, center = Offset(e.x + bossWidth / 2f, e.y + bossHeight / 2f))
-                                drawCircle(bossColor, radius = 10f + pulse, center = Offset(e.x + bossWidth / 2f, e.y + bossHeight / 2f))
+                            BossType.OMEGA -> {
+                                val omegaTilt = sin(frameTick * 0.05f) * 4f
+                                rotate(degrees = omegaTilt, pivot = Offset(e.x + bossWidth / 2f, e.y + bossHeight / 2f)) {
+                                    drawImage(
+                                        image = omegaBitmap,
+                                        dstOffset = IntOffset(e.x.toInt(), e.y.toInt()),
+                                        dstSize = IntSize(bossWidth.toInt(), bossHeight.toInt()),
+                                        colorFilter = if (isFlashing) ColorFilter.tint(Color.White) else null,
+                                        filterQuality = FilterQuality.None
+                                    )
+                                }
                             }
                         }
                     } else {
                         val bitmapToDraw = when (e.kind) {
+                            EnemyKind.ERA_VOID_PRISMA -> vazioBitmap
+                            EnemyKind.ERA_VOID_TESSERACT -> tesseractBitmap
+                            EnemyKind.ERA_VOID_ENIGMA -> enigmaBitmap
                             EnemyKind.ERA_BIO_PARASITA -> parasitaBitmap
                             EnemyKind.ERA_BIO_INSECTOID -> insectoidBitmap
                             EnemyKind.ERA_BIO_CASULO -> casuloBitmap
@@ -2024,19 +1580,25 @@ fun DynamicGamePlayScreen(
                             EnemyKind.BEETLE_SHOOTER -> beetleShooterBitmap
                             else -> normalInvaderBitmap
                         }
+                        val alphaFactor = if (e.isPhasedOut) 0.35f else 1.0f
+
                         drawImage(
                             image = bitmapToDraw,
                             dstOffset = IntOffset(e.x.toInt(), e.y.toInt()),
                             dstSize = IntSize(enemySize.toInt(), enemySize.toInt()),
+                            alpha = alphaFactor,
                             filterQuality = FilterQuality.None
                         )
 
-                        if (e.kind == EnemyKind.ERA_FIRE_ARIETE && e.hasShield) {
-                            drawCircle(
-                                color = Color(0xFFFFB703).copy(alpha = 0.65f),
-                                radius = enemySize * 0.58f,
-                                center = Offset(e.x + enemySize / 2f, e.y + enemySize / 2f),
-                                style = Stroke(width = 2.5f)
+                        if (e.kind == EnemyKind.ERA_VOID_PRISMA) {
+                            drawArc(
+                                color = Color(0xFF38BDF8).copy(alpha = 0.75f),
+                                startAngle = 30f,
+                                sweepAngle = 120f,
+                                useCenter = false,
+                                topLeft = Offset(e.x - 4f, e.y + enemySize * 0.6f),
+                                size = Size(enemySize + 8f, 16f),
+                                style = Stroke(width = 3f)
                             )
                         }
                     }
@@ -2047,6 +1609,7 @@ fun DynamicGamePlayScreen(
                     if (b.isEnemy) {
                         val enemyLaserColor = when {
                             b.isParalyzing -> Color(0xFF10B981)
+                            isVoidEra -> Color(0xFFD946EF)
                             isBioEra -> Color(0xFF34D399)
                             isFireEra -> Color(0xFFFF9E00)
                             else -> Color(0xFFFF3366)
@@ -2059,11 +1622,10 @@ fun DynamicGamePlayScreen(
                         )
                     } else {
                         val bulletThickness = if (b.damage > 1) 13f else 8f
-                        val bulletLength = 26f
                         drawRoundRect(
                             color = equippedSkin.primaryColor,
                             topLeft = Offset(b.x - bulletThickness / 2f, b.y),
-                            size = Size(bulletThickness, bulletLength),
+                            size = Size(bulletThickness, 26f),
                             cornerRadius = CornerRadius(1f, 1f)
                         )
                     }
@@ -2118,6 +1680,7 @@ fun DynamicGamePlayScreen(
                                 1.dp,
                                 when {
                                     currentWave % 5 == 0 -> Color(0xFFFF0055)
+                                    isVoidEra -> Color(0xFFD946EF)
                                     isBioEra -> Color(0xFF10B981)
                                     isFireEra -> Color(0xFFFF9E00)
                                     else -> Color(0xFFFFB703)
